@@ -10,3 +10,4 @@ Licencia: GPL v3
 
 Descripción:  
 """
+os.system("/bin/bash create_tree.sh tree.ini")
