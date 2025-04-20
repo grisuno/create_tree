@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# Verifica si se pasaron el archivo de estructura y el tipo de scaffolding como argumentos
+if [ $# -ne 2 ]; then
+    echo "Uso: $0 <archivo_estructura.txt> <tipo_scaffolding|all>"
+    echo "Tipos de scaffolding disponibles: controller, model, route, view, all"
+    exit 1
+fi
+
+structure_file="$1"
+scaffold_type="$2"
+
+# Verifica si el archivo de estructura existe
+if [ ! -f "$structure_file" ]; then
+    echo "Error: El archivo de estructura '$structure_file' no existe"
+    exit 1
+fi
+
+# Obtiene el directorio raíz del proyecto del archivo de estructura (la primera línea que termina en '/')
+root_dir=$(head -n 1 "$structure_file" | grep -Eo '^[^/]+/|^[^/]+/$')
+if [ -z "$root_dir" ]; then
+    echo "Error: No se encontró un directorio raíz en el archivo de estructura."
+    exit 1
+fi
+root_dir="${root_dir%/}" # Elimina la barra final si existe
+
+# Función para aplicar el scaffolding a un archivo
+apply_scaffold_to_file() {
+    local file_path="$1"
+    local scaffold="$2"
+    local filename=$(basename "$file_path")
+    local filename_without_ext="${filename%.*}" # Elimina la extensión
+
+    echo "Aplicando scaffolding '$scaffold' a: $file_path"
+
+    case "$scaffold" in
+        controller)
+            # Ejemplo de scaffolding para un controlador de Flask
+            echo "from flask import Blueprint" > "$file_path"
+            echo "" >> "$file_path"
+            echo "${filename_without_ext}_bp = Blueprint('${filename_without_ext}', __name__, url_prefix='/${filename_without_ext}')" >> "$file_path"
+            echo "" >> "$file_path"
+            echo "@${filename_without_ext}_bp.route('/')" >> "$file_path"
+            echo "def index():" >> "$file_path"
+            echo "    return '¡Hola desde ${filename_without_ext}!' " >> "$file_path"
+            ;;
+        model)
+            # Ejemplo de scaffolding para un modelo (podría ser genérico o para una ORM específica)
+            echo "# Modelo para $filename_without_ext" > "$file_path"
+            echo "class $(echo "$filename_without_ext" | sed 's/^\(.\)/\U\1/; s/\(.\)\([A-Z]\)/\1_\L\2/g'):" >> "$file_path"
+            echo "    def __init__(self, ...):" >> "$file_path"
+            echo "        pass" >> "$file_path"
+            echo "" >> "$file_path"
+            ;;
+        route)
+            # Ejemplo de scaffolding para una ruta (podría ser un archivo separado o dentro de un Blueprint)
+            echo "# Rutas para $filename_without_ext" > "$file_path"
+            echo "# from . import ${filename_without_ext}_bp" >> "$file_path"
+            echo "" >> "$file_path"
+            echo "# app.register_blueprint(${filename_without_ext}_bp)" >> "$file_path"
+            ;;
+        view)
+            # Ejemplo de scaffolding para una vista (HTML básico)
+            echo "<!DOCTYPE html>" > "$file_path"
+            echo "<html lang=\"en\">" >> "$file_path"
+            echo "<head>" >> "$file_path"
+            echo "    <meta charset=\"UTF-8\">" >> "$file_path"
+            echo "    <title>$filename_without_ext</title>" >> "$file_path"
+            echo "</head>" >> "$file_path"
+            echo "<body>" >> "$file_path"
+            echo "    <h1>Bienvenido a $filename_without_ext</h1>" >> "$file_path"
+            echo "</body>" >> "$file_path"
+            echo "</html>" >> "$file_path"
+            ;;
+        *)
+            echo "Error: Tipo de scaffolding '$scaffold' no reconocido."
+            ;;
+    esac
+}
+
+# Lee el archivo de estructura línea por línea y aplica el scaffolding a los archivos
+while IFS= read -r line; do
+    # Ignora líneas vacías y directorios (terminan en /)
+    if [ -z "$line" ] || [[ "$line" =~ /$ ]]; then
+        continue
+    fi
+
+    # Extrae el nombre del archivo (similar a mktree)
+    name=$(echo "$line" | sed 's/^[│\ ├└─]*//' | sed 's/\s*#.*$//')
+
+    # Construye la ruta completa del archivo asumiendo que estamos en la raíz del proyecto
+    file_path="$root_dir/$name"
+
+    # Aplica el scaffolding según el tipo especificado
+    case "$scaffold_type" in
+        controller)
+            if [[ "$file_path" =~ controllers/.*\.py$ ]]; then
+                apply_scaffold_to_file "$file_path" "controller"
+            fi
+            ;;
+        model)
+            if [[ "$file_path" =~ models/.*\.py$ ]]; then
+                apply_scaffold_to_file "$file_path" "model"
+            fi
+            ;;
+        route)
+            if [[ "$file_path" =~ routes/.*\.py$ ]]; then
+                apply_scaffold_to_file "$file_path" "route"
+            fi
+            ;;
+        view)
+            if [[ "$file_path" =~ views/.*\.(html|htm|tpl)$ ]]; then
+                apply_scaffold_to_file "$file_path" "view"
+            fi
+            ;;
+        all)
+            if [[ "$file_path" =~ controllers/.*\.py$ ]]; then
+                apply_scaffold_to_file "$file_path" "controller"
+            elif [[ "$file_path" =~ models/.*\.py$ ]]; then
+                apply_scaffold_to_file "$file_path" "model"
+            elif [[ "$file_path" =~ routes/.*\.py$ ]]; then
+                apply_scaffold_to_file "$file_path" "route"
+            elif [[ "$file_path" =~ views/.*\.(html|htm|tpl)$ ]]; then
+                apply_scaffold_to_file "$file_path" "view"
+            fi
+            ;;
+        *)
+            echo "Error: Tipo de scaffolding '$scaffold_type' no válido."
+            exit 1
+            ;;
+    esac
+
+done < "$structure_file"
+
+echo "Scaffolding aplicado exitosamente."
